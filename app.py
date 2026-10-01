@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dash import Dash, Input, Output, html
+from dash import Dash, Input, Output, State, ctx, html, no_update
 
 from config import DEFAULT_RESULTS_DIR, HOST, PORT
 from src.figures import (
@@ -14,7 +14,7 @@ from src.figures import (
 )
 from src.layout import build_layout
 from src.metrics import build_dashboard_payload
-from src.result_loader import ResultLoadError, list_result_files, load_result
+from src.result_loader import ResultLoadError, list_result_files, load_result, load_uploaded_result
 
 
 def _result_options() -> list[dict[str, str]]:
@@ -50,18 +50,28 @@ def _metric_card(label: str, value: str, caption: str = "") -> html.Div:
     Output("load-message", "children"),
     Output("load-message", "className"),
     Input("result-select", "value"),
+    Input("result-upload", "contents"),
+    State("result-upload", "filename"),
 )
-def load_selected_result(filename: str | None):
-    if not filename:
-        return None, f"JSON 결과 파일을 찾지 못했습니다. 기본 결과 폴더: {DEFAULT_RESULTS_DIR}", "status-message status-warning"
+def load_selected_result(filename: str | None, upload_contents: str | None, upload_filename: str | None):
+    is_upload = ctx.triggered_id == "result-upload"
+    if is_upload and not upload_contents:
+        return no_update, no_update, no_update
+    if not is_upload and not filename:
+        return None, f"JSON 결과 파일을 찾지 못했습니다. 결과 폴더: {DEFAULT_RESULTS_DIR}", "status-message status-warning"
     try:
-        result = load_result(filename)
+        if is_upload:
+            result = load_uploaded_result(upload_filename, upload_contents)
+            selected_name = f"업로드 · {result['filename']}"
+        else:
+            result = load_result(filename)
+            selected_name = filename
         payload = build_dashboard_payload(result)
         if payload["notes"]:
-            message = f"{filename} 로드 완료 · 확인할 참고 항목 {len(payload['notes'])}개"
+            message = f"{selected_name} 로드 완료 · 확인할 참고 항목 {len(payload['notes'])}개"
             class_name = "status-message status-warning"
         else:
-            message = f"{filename} 로드 완료"
+            message = f"{selected_name} 로드 완료"
             class_name = "status-message status-ok"
         return payload, message, class_name
     except ResultLoadError as exc:

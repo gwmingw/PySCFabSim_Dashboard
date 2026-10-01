@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import math
 import re
@@ -23,6 +25,7 @@ LOT_FIELDS = (
     "waiting_time_batching",
 )
 MACHINE_FIELDS = ("avail", "util", "pm", "br", "setup", "waiting_time")
+MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
 class ResultLoadError(ValueError):
@@ -102,24 +105,12 @@ def _read_metadata(json_path: Path) -> tuple[dict[str, Any], list[str]]:
     return metadata, notes
 
 
-def load_result(filename: str, results_dir: Path | str = DEFAULT_RESULTS_DIR) -> dict[str, Any]:
-    """Load a result by basename, enforcing that it stays in results_dir."""
-    if not filename or Path(filename).name != filename or Path(filename).suffix.lower() != ".json":
-        raise ResultLoadError("결과 폴더 안의 JSON 파일을 선택해 주세요.")
-
-    directory = Path(results_dir).resolve()
-    json_path = (directory / filename).resolve()
-    if json_path.parent != directory:
-        raise ResultLoadError("선택한 파일이 결과 폴더 밖에 있습니다.")
-    if not json_path.is_file():
-        raise ResultLoadError(f"결과 파일을 찾을 수 없습니다: {json_path}")
-
-    try:
-        with json_path.open("r", encoding="utf-8-sig") as stream:
-            raw = json.load(stream)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise ResultLoadError(f"JSON을 읽을 수 없습니다: {exc}") from exc
-
+def _normalize_result(
+    raw: Any,
+    filename: str,
+    metadata: dict[str, Any],
+    notes: list[str],
+) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ResultLoadError("JSON 최상위 값은 객체여야 합니다.")
     missing_top = sorted(REQUIRED_TOP_LEVEL - raw.keys())
@@ -128,7 +119,6 @@ def load_result(filename: str, results_dir: Path | str = DEFAULT_RESULTS_DIR) ->
     if not isinstance(raw["lots"], dict) or not isinstance(raw["machines"], dict):
         raise ResultLoadError("lots와 machines는 JSON 객체여야 합니다.")
 
-    notes: list[str] = []
     lots: list[dict[str, Any]] = []
     for name, fields in raw["lots"].items():
         if not isinstance(fields, dict):
@@ -158,13 +148,70 @@ def load_result(filename: str, results_dir: Path | str = DEFAULT_RESULTS_DIR) ->
     if not machines:
         notes.append("유효한 Tool Group 데이터가 없습니다.")
 
-    metadata, metadata_notes = _read_metadata(json_path)
-    notes.extend(metadata_notes)
     return {
-        "filename": json_path.name,
+        "filename": filename,
         "metadata": metadata,
         "lots": lots,
         "machines": machines,
         "plugins": raw.get("plugins", {}) if isinstance(raw.get("plugins", {}), dict) else {},
         "notes": list(dict.fromkeys(notes)),
     }
+
+
+def load_result(filename: str, results_dir: Path | str = DEFAULT_RESULTS_DIR) -> dict[str, Any]:
+    """Load a result by basename, enforcing that it stays in results_dir."""
+    if not filename or Path(filename).name != filename or Path(filename).suffix.lower() != ".json":
+        raise ResultLoadError("결과 폴더 안의 JSON 파일을 선택해 주세요.")
+
+    directory = Path(results_dir).resolve()
+    json_path = (directory / filename).resolve()
+    if json_path.parent != directory:
+        raise ResultLoadError("선택한 파일이 결과 폴더 밖에 있습니다.")
+    if not json_path.is_file():
+        raise ResultLoadError(f"결과 파일을 찾을 수 없습니다: {json_path}")
+
+    try:
+        with json_path.open("r", encoding="utf-8-sig") as stream:
+            raw = json.load(stream)
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ResultLoadError(f"JSON을 읽을 수 없습니다: {exc}") from exc
+
+    metadata, metadata_notes = _read_metadata(json_path)
+    return _normalize_result(raw, json_path.name, metadata, metadata_notes)
+
+
+def load_uploaded_result(filename: str | None, contents: str | None) -> dict[str, Any]:
+    """Decode and validate an uploaded JSON result without writing it to disk."""
+    if not filename or Path(filename).suffix.lower() != ".json":
+        raise ResultLoadError("PySCFabSim 결과 JSON 파일을 선택해 주세요.")
+    if not contents or "," not in contents:
+        raise ResultLoadError("업로드 파일 내용을 읽지 못했습니다.")
+
+    header, encoded = contents.split(",", 1)
+    if ";base64" not in header.lower():
+        raise ResultLoadError("지원하지 않는 업로드 인코딩입니다.")
+    if len(encoded) > (MAX_UPLOAD_BYTES * 4 // 3 + 8):
+        raise ResultLoadError("JSON 파일은 10 MB 이하만 업로드할 수 있습니다.")
+
+    try:
+        decoded = base64.b64decode(encoded, validate=True)
+        if len(decoded) > MAX_UPLOAD_BYTES:
+            raise ResultLoadError("JSON 파일은 10 MB 이하만 업로드할 수 있습니다.")
+        raw = json.loads(decoded.decode("utf-8-sig"))
+    except (binascii.Error, UnicodeError, json.JSONDecodeError, ValueError) as exc:
+        if isinstance(exc, ResultLoadError):
+            raise
+        raise ResultLoadError(f"JSON 업로드를 읽을 수 없습니다: {exc}") from exc
+
+    metadata: dict[str, Any] = {
+        "dataset": "미상",
+        "dispatcher": "미상",
+        "days": None,
+        "seed": "미상",
+        "runtime": "미상",
+    }
+    days_from_name = re.search(r"(?:^|_)(\d+)days(?:_|$)", Path(filename).stem, flags=re.IGNORECASE)
+    if days_from_name:
+        metadata["days"] = int(days_from_name.group(1))
+    notes = ["업로드한 JSON만 읽었습니다. 같은 이름의 .log·요약 파일은 업로드되지 않아 실행 설정이 미상일 수 있습니다."]
+    return _normalize_result(raw, Path(filename).name, metadata, notes)

@@ -11,6 +11,7 @@ env/
 # Local result data and logs
 outputs/
 *.log
+!examples/baseline_30days.log
 
 # Local environment and editor files
 .env

@@ -12,7 +12,8 @@ PySCFabSim 시뮬레이션 **결과 파일만 읽어서** CR 기준 생산운영
 
 ### 포함
 
-- 실행 결과 JSON을 선택해 로드하고, 실행 설정 및 데이터 검증 상태를 표시
+- 기본 샘플 JSON 또는 결과 폴더의 JSON을 선택하고, 탐색기에서 JSON을 직접 열어 로드
+- 실행 설정 및 데이터 검증 상태 표시
 - 완료 lot 수, 처리량, Cycle Time, 정시 완료율 등 전체 KPI 요약
 - `Lot_1`, `HotLot_1` 등 lot 그룹별 처리량·Cycle Time·납기 성과 비교
 - Tool Group별 Utilization, 가용률, PM, Breakdown, Setup, 평균 대기시간 탐색
@@ -30,7 +31,7 @@ PySCFabSim 시뮬레이션 **결과 파일만 읽어서** CR 기준 생산운영
 
 ## 3. 입력 파일
 
-기본 실행 예시는 프로젝트 루트의 다음 결과 폴더를 사용한다. 이 결과 파일은 대시보드 저장소에 포함되어 있지 않으며, 독립 저장소에서 실행할 때는 `PYSCFABSIM_RESULTS_DIR`로 경로를 지정한다.
+실제 실행 결과는 다음 폴더에서 선택하거나 탐색기에서 직접 열 수 있다. 팀원이 PySCFabSim이나 SMT2020 데이터를 설치하지 않아도 화면을 확인할 수 있도록 `examples/`에 30일 baseline 결과 샘플을 포함한다.
 
 ```text
 outputs/PySCFabSim_baseline/
@@ -50,7 +51,9 @@ machines[tool_group] = {avail, util, pm, br, setup, waiting_time}
 plugins[cost]
 ```
 
-로더는 파일명과 같은 이름의 `.log`가 있으면 데이터셋·Dispatcher·실제 simulated days를 읽는다. 현재 JSON에는 seed가 없어 기존 실행의 seed는 `baseline_30days_summary.md`의 기록 또는 사용자가 지정한 메타데이터를 사용하고, 확인할 수 없는 설정은 추측하지 않고 `미상`으로 표시한다. 지표 계산은 JSON을 기준으로 한다.
+결과 폴더에서 선택한 파일은 같은 이름의 `.log`가 있으면 데이터셋·Dispatcher·실제 simulated days를 읽고, `_summary.md`가 있으면 seed를 읽는다. 탐색기에서 직접 연 JSON은 디스크에 저장하지 않고 현재 화면에서만 읽으며, sidecar `.log`·요약 파일은 자동으로 찾지 않는다. 이 경우 JSON 파일명에서 기간을 확인하고 나머지 실행 설정은 `미상`으로 표시할 수 있다. KPI 계산은 JSON 기준이다.
+
+탐색기에서는 `.json` 파일 한 개씩 선택할 수 있으며, 10 MB 이하이고 최상위 `lots`, `machines` 항목이 객체인 PySCFabSim 결과를 지원한다. `examples/baseline_30days.json`은 기존 30일 CR baseline의 집계 결과 샘플이며, SMT2020 원본 모델 파일은 포함하지 않는다.
 
 ### 로컬에서 실행
 
@@ -64,9 +67,9 @@ python -m pip install -r requirements.txt
 python app.py
 ```
 
-브라우저에서 `http://127.0.0.1:8050`을 연다. 앱 시작 시 지정된 결과 폴더의 JSON 목록을 읽어 파일 선택 메뉴를 만든다. 다른 결과 폴더는 `PYSCFABSIM_RESULTS_DIR` 환경변수로 지정할 수 있다. 이 버전은 완료된 JSON 결과를 읽으며 화면에서 새 시뮬레이션을 시작하지 않는다.
+브라우저에서 `http://127.0.0.1:8050`을 연다. 결과 폴더의 JSON은 파일 선택 메뉴에서 고르고, **탐색기에서 JSON 선택** 버튼으로 임의의 PySCFabSim 결과를 직접 열 수도 있다. 업로드한 JSON 내용은 대시보드 프로세스에서 분석하며 파일로 저장하지 않는다. 이 버전은 완료된 JSON 결과를 읽으며 화면에서 새 시뮬레이션을 시작하지 않는다.
 
-대시보드 폴더만 별도 GitHub 저장소로 clone한 경우에는 결과 JSON 경로를 환경변수로 지정한다. 결과 파일은 이 저장소에 포함하지 않는 것을 기본으로 한다.
+대시보드 폴더만 별도 GitHub 저장소로 clone하면 환경변수가 없을 때 `examples/`의 샘플이 기본으로 열린다. 팀원들의 결과 JSON은 별도 폴더에 모아 아래 환경변수로 지정하거나, 탐색기에서 하나씩 열 수 있다. 샘플 외 실행 결과는 저장소에 추가하지 않는 것을 기본으로 한다.
 
 ```powershell
 $env:PYSCFABSIM_RESULTS_DIR = "C:\path\to\outputs\PySCFabSim_baseline"
@@ -78,7 +81,13 @@ export PYSCFABSIM_RESULTS_DIR="/path/to/outputs/PySCFabSim_baseline"
 python app.py
 ```
 
-환경변수가 없으면 기존 프로젝트 구조의 `outputs/PySCFabSim_baseline`을 사용한다.
+결과 경로 선택 순서는 다음과 같다.
+
+1. `PYSCFABSIM_RESULTS_DIR`에 지정한 경로
+2. 기존 프로젝트의 `outputs/PySCFabSim_baseline` 폴더에 JSON이 있을 때 해당 폴더
+3. 위 경로가 없거나 비어 있으면 저장소의 `examples/`
+
+탐색기에서 직접 연 파일은 위 결과 목록을 변경하지 않는다. 결과 폴더에 JSON을 추가한 뒤에는 목록을 새로 읽도록 앱을 다시 시작한다.
 
 ## 4. 화면 구성
 
@@ -130,6 +139,10 @@ python app.py
 ├── config.py                 # 기본 결과 폴더 및 앱 설정
 ├── assets/
 │   └── style.css             # 대시보드 테마와 작은 화면 배치
+├── examples/
+│   ├── baseline_30days.json  # clone 직후 화면 확인용 집계 샘플
+│   ├── baseline_30days.log   # 샘플 실행 설정 메타데이터
+│   └── baseline_30days_summary.md
 └── src/
     ├── result_loader.py      # JSON / 선택적 로그 로딩 및 스키마 확인
     ├── metrics.py            # 지표 변환과 단위 정규화
@@ -153,7 +166,8 @@ PySCFabSim lot 집계의 `tardiness`는 초 단위 누적값이다. 대시보드
 
 ## 8. 완료 기준
 
-- 결과 폴더에 `baseline_30days.json` 등 유효한 JSON이 있으면 핵심 KPI와 실행 메타데이터가 표시된다.
+- 저장소의 샘플 JSON으로 clone 직후 핵심 KPI와 실행 메타데이터가 표시된다.
+- 결과 폴더 파일 선택 또는 탐색기 업로드로 호환 JSON을 불러올 수 있다.
 - lot 우선순위·지표 선택으로 Lot 그룹 차트와 표가 갱신된다.
 - 설비 지표·상위 N 선택으로 순위 차트가 갱신되며, 표에서 검색·정렬할 수 있다.
 - JSON 필수 키가 없거나 값이 비어 있어도 원인과 파일 위치가 읽기 쉬운 오류로 표시된다.
@@ -171,6 +185,7 @@ PySCFabSim lot 집계의 `tardiness`는 초 단위 누적값이다. 대시보드
 ## 참고
 
 - 현재 기준 실행: `outputs/PySCFabSim_baseline/baseline_30days.json`
+- 저장소 데모 결과: `examples/baseline_30days.json` (SMT2020 LV/HM, CR, 30일, seed 0)
 - PySCFabSim 결과 집계 원본: [simulation/stats.py](https://github.com/prosysscience/PySCFabSim-release/blob/master/simulation/stats.py)
 - Dash 콜백 개념: <https://dash.plotly.com/basic-callbacks>
 
@@ -184,9 +199,4 @@ PySCFabSim lot 집계의 `tardiness`는 초 단위 누적값이다. 대시보드
 
 논문 PDF와 원본 데이터 파일은 저장소에 재배포하지 말고 위의 원 출처를 연결한다. 논문·데이터·시뮬레이터의 이용 및 재배포 조건은 각각 원 출처의 안내를 따른다.
 
-## GitHub 공개 전 확인
 
-- 대시보드 코드에 적용할 라이선스를 프로젝트 소유자가 결정한다. 현재 저장소에는 대시보드 코드 라이선스가 지정되어 있지 않다.
-- baseline JSON, 로그, 가상환경, 개인 경로, 비밀값이 커밋되지 않았는지 확인한다. 결과 파일은 별도 경로로 지정할 수 있다.
-- 새 clone 환경에서 설치·실행을 확인하고, 사용할 Python 버전과 의존성을 기록한다.
-- README의 입력 경로·화면 설명·실행 결과가 공개할 코드와 일치하는지 확인한다.

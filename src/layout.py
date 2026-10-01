@@ -79,7 +79,18 @@ def build_layout(result_options: list[dict], selected_file: str | None):
                 [
                     html.Div([html.Div("FAB OPERATIONS", className="eyebrow"), html.H1("PySCFabSim 결과 대시보드"), html.P("기준 생산운영 결과를 lot 그룹과 설비 관점에서 탐색합니다.")]),
                     html.Div(
-                        [html.Label("결과 파일", htmlFor="result-select"), dcc.Dropdown(id="result-select", options=result_options, value=selected_file, clearable=False, placeholder="PySCFabSim 결과 JSON 선택")],
+                        [
+                            html.Label("결과 파일", htmlFor="result-select"),
+                            dcc.Dropdown(id="result-select", options=result_options, value=selected_file, clearable=False, placeholder="결과 폴더의 JSON 선택"),
+                            dcc.Upload(
+                                id="result-upload",
+                                children=html.Button("탐색기에서 JSON 선택", type="button", className="upload-button"),
+                                accept=".json,application/json",
+                                multiple=False,
+                                className="upload-control",
+                            ),
+                            html.Div("업로드한 파일은 저장하지 않고 현재 화면에서만 읽습니다.", className="upload-hint"),
+                        ],
                         className="file-picker",
                     ),
                 ],
