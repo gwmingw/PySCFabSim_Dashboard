@@ -31,7 +31,7 @@ PySCFabSim 시뮬레이션 **결과 파일만 읽어서** CR 기준 생산운영
 
 ## 3. 입력 파일
 
-실제 실행 결과는 다음 폴더에서 선택하거나 탐색기에서 직접 열 수 있다. 팀원이 PySCFabSim이나 SMT2020 데이터를 설치하지 않아도 화면을 확인할 수 있도록 `examples/`에 30일 baseline 결과 샘플을 포함한다.
+실제 실행 결과는 다음 폴더에서 선택하거나 탐색기에서 직접 열 수 있다. 팀원이 PySCFabSim이나 SMT2020 데이터를 설치하지 않아도 화면을 확인할 수 있도록 `examples/`에 30일 baseline과 90일·365일 결과 샘플을 포함한다.
 
 ```text
 outputs/PySCFabSim_baseline/
@@ -39,6 +39,8 @@ outputs/PySCFabSim_baseline/
 ├── baseline_30days.log    # 선택: 데이터셋·Dispatcher·실행 일수·실행 로그
 └── baseline_30days_summary.md  # 참고용 사람이 읽는 요약; 계산의 원천으로 사용하지 않음
 ```
+
+저장소에 포함된 선택 가능한 JSON 샘플은 `examples/baseline_30days.json`, `examples/greedy_seed0_90days_SMT2020_LVHM_cr.json`, `examples/greedy_seed0_365days_SMT2020_LVHM_cr.json`이다. 30일 샘플만 `.log`와 요약 파일을 함께 제공하며, 90일·365일 샘플은 JSON 파일명에서 기간을 읽고 나머지 실행 메타데이터는 미상으로 표시할 수 있다.
 
 JSON의 예상 구조:
 
@@ -53,7 +55,7 @@ plugins[cost]
 
 결과 폴더에서 선택한 파일은 같은 이름의 `.log`가 있으면 데이터셋·Dispatcher·실제 simulated days를 읽고, `_summary.md`가 있으면 seed를 읽는다. 탐색기에서 직접 연 JSON은 디스크에 저장하지 않고 현재 화면에서만 읽으며, sidecar `.log`·요약 파일은 자동으로 찾지 않는다. 이 경우 JSON 파일명에서 기간을 확인하고 나머지 실행 설정은 `미상`으로 표시할 수 있다. KPI 계산은 JSON 기준이다.
 
-탐색기에서는 `.json` 파일 한 개씩 선택할 수 있으며, 10 MB 이하이고 최상위 `lots`, `machines` 항목이 객체인 PySCFabSim 결과를 지원한다. `examples/baseline_30days.json`은 기존 30일 CR baseline의 집계 결과 샘플이며, SMT2020 원본 모델 파일은 포함하지 않는다.
+탐색기에서는 `.json` 파일 한 개씩 선택할 수 있으며, 3 MB 이하이고 최상위 `lots`, `machines` 항목이 객체인 PySCFabSim 결과를 지원한다. `examples/`의 세 JSON은 모두 완료 lot 및 설비별 최종 집계 결과 샘플이며, SMT2020 원본 모델 파일은 포함하지 않는다.
 
 ### 로컬에서 실행
 
@@ -81,11 +83,13 @@ export PYSCFABSIM_RESULTS_DIR="/path/to/outputs/PySCFabSim_baseline"
 python app.py
 ```
 
-결과 경로 선택 순서는 다음과 같다.
+로컬 결과 경로 선택 순서는 다음과 같다.
 
 1. `PYSCFABSIM_RESULTS_DIR`에 지정한 경로
 2. 기존 프로젝트의 `outputs/PySCFabSim_baseline` 폴더에 JSON이 있을 때 해당 폴더
 3. 위 경로가 없거나 비어 있으면 저장소의 `examples/`
+
+Vercel에서는 `PYSCFABSIM_RESULTS_DIR`을 지정하지 않으면 레포에 포함된 `examples/`를 사용한다. 업로드 JSON은 Vercel 서버에서 처리되며 디스크에 저장하지 않는다.
 
 탐색기에서 직접 연 파일은 위 결과 목록을 변경하지 않는다. 결과 폴더에 JSON을 추가한 뒤에는 목록을 새로 읽도록 앱을 다시 시작한다.
 
@@ -140,9 +144,11 @@ python app.py
 ├── assets/
 │   └── style.css             # 대시보드 테마와 작은 화면 배치
 ├── examples/
-│   ├── baseline_30days.json  # clone 직후 화면 확인용 집계 샘플
-│   ├── baseline_30days.log   # 샘플 실행 설정 메타데이터
-│   └── baseline_30days_summary.md
+│   ├── baseline_30days.json  # 30일 집계 샘플
+│   ├── baseline_30days.log   # 30일 샘플 실행 설정 메타데이터
+│   ├── baseline_30days_summary.md
+│   ├── greedy_seed0_90days_SMT2020_LVHM_cr.json
+│   └── greedy_seed0_365days_SMT2020_LVHM_cr.json
 └── src/
     ├── result_loader.py      # JSON / 선택적 로그 로딩 및 스키마 확인
     ├── metrics.py            # 지표 변환과 단위 정규화
@@ -150,7 +156,7 @@ python app.py
     └── layout.py             # 공통 화면과 섹션 구성
 ```
 
-PySCFabSim 원본 코드나 시뮬레이션 결과 파일은 이 대시보드 폴더에 복사·변경하지 않는다. 기본 결과 경로는 기존 프로젝트 구조를 위한 값이며, 독립 clone에서는 `PYSCFABSIM_RESULTS_DIR`로 로컬 결과 폴더를 지정한다.
+PySCFabSim 원본 코드와 SMT2020 원본 모델 데이터는 이 대시보드 저장소에 포함하지 않는다. `examples/`에는 화면 확인을 위한 집계 결과 JSON 세 개만 포함한다. 기본 결과 경로는 기존 프로젝트 구조를 위한 값이며, 독립 clone에서는 `PYSCFABSIM_RESULTS_DIR`로 로컬 결과 폴더를 지정한다.
 
 ## 7. 구현 구성 및 지표 해석
 
@@ -185,7 +191,7 @@ PySCFabSim lot 집계의 `tardiness`는 초 단위 누적값이다. 대시보드
 ## 참고
 
 - 현재 기준 실행: `outputs/PySCFabSim_baseline/baseline_30days.json`
-- 저장소 데모 결과: `examples/baseline_30days.json` (SMT2020 LV/HM, CR, 30일, seed 0)
+- 저장소 데모 결과: `examples/`의 30일·90일·365일 집계 JSON 샘플 (SMT2020 LV/HM 시뮬레이션 결과)
 - PySCFabSim 결과 집계 원본: [simulation/stats.py](https://github.com/prosysscience/PySCFabSim-release/blob/master/simulation/stats.py)
 - Dash 콜백 개념: <https://dash.plotly.com/basic-callbacks>
 

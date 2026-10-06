@@ -25,7 +25,7 @@ LOT_FIELDS = (
     "waiting_time_batching",
 )
 MACHINE_FIELDS = ("avail", "util", "pm", "br", "setup", "waiting_time")
-MAX_UPLOAD_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 3 * 1024 * 1024
 
 
 class ResultLoadError(ValueError):
@@ -191,12 +191,12 @@ def load_uploaded_result(filename: str | None, contents: str | None) -> dict[str
     if ";base64" not in header.lower():
         raise ResultLoadError("지원하지 않는 업로드 인코딩입니다.")
     if len(encoded) > (MAX_UPLOAD_BYTES * 4 // 3 + 8):
-        raise ResultLoadError("JSON 파일은 10 MB 이하만 업로드할 수 있습니다.")
+        raise ResultLoadError("JSON 파일은 3 MB 이하만 업로드할 수 있습니다.")
 
     try:
         decoded = base64.b64decode(encoded, validate=True)
         if len(decoded) > MAX_UPLOAD_BYTES:
-            raise ResultLoadError("JSON 파일은 10 MB 이하만 업로드할 수 있습니다.")
+            raise ResultLoadError("JSON 파일은 3 MB 이하만 업로드할 수 있습니다.")
         raw = json.loads(decoded.decode("utf-8-sig"))
     except (binascii.Error, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         if isinstance(exc, ResultLoadError):

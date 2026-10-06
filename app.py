@@ -24,9 +24,12 @@ def _result_options() -> list[dict[str, str]]:
 RESULT_OPTIONS = _result_options()
 DEFAULT_FILE = RESULT_OPTIONS[0]["value"] if RESULT_OPTIONS else None
 
-app = Dash(__name__, title="PySCFabSim 결과 대시보드", update_title="결과를 불러오는 중...")
-app.layout = build_layout(RESULT_OPTIONS, DEFAULT_FILE)
-server = app.server
+dash_app = Dash(__name__, title="PySCFabSim 결과 대시보드", update_title="결과를 불러오는 중...")
+dash_app.layout = build_layout(RESULT_OPTIONS, DEFAULT_FILE)
+
+# Vercel's Python runtime expects a WSGI application named `app`.
+app = dash_app.server
+server = app
 
 
 def _format(value, digits: int = 2, suffix: str = "") -> str:
@@ -45,7 +48,7 @@ def _metric_card(label: str, value: str, caption: str = "") -> html.Div:
     )
 
 
-@app.callback(
+@dash_app.callback(
     Output("result-data", "data"),
     Output("load-message", "children"),
     Output("load-message", "className"),
@@ -78,7 +81,7 @@ def load_selected_result(filename: str | None, upload_contents: str | None, uplo
         return None, f"결과를 불러오지 못했습니다: {exc}", "status-message status-error"
 
 
-@app.callback(Output("run-meta", "children"), Input("result-data", "data"))
+@dash_app.callback(Output("run-meta", "children"), Input("result-data", "data"))
 def show_run_metadata(payload):
     if not payload:
         return html.Div("결과 메타데이터 없음", className="meta-chip")
@@ -95,7 +98,7 @@ def show_run_metadata(payload):
     return [html.Div([html.Span(label, className="meta-label"), html.Span(str(value), className="meta-value")], className="meta-chip") for label, value in items]
 
 
-@app.callback(
+@dash_app.callback(
     Output("overview-cards", "children"),
     Output("overview-lot-chart", "figure"),
     Output("overview-equipment-chart", "figure"),
@@ -121,7 +124,7 @@ def render_overview(payload):
     return cards, overview_lot_figure(payload["lots"]), equipment_metric_figure(payload["machines"], "util_pct", 10), notes
 
 
-@app.callback(
+@dash_app.callback(
     Output("lot-metric-chart", "figure"),
     Output("lot-table", "data"),
     Input("result-data", "data"),
@@ -136,7 +139,7 @@ def render_lot_results(payload, priority, metric):
     return lot_metric_figure(lots, priority or "전체 유형", metric or "act_days"), selected
 
 
-@app.callback(
+@dash_app.callback(
     Output("equipment-metric-chart", "figure"),
     Output("equipment-scatter-chart", "figure"),
     Output("machine-table", "data"),
@@ -158,4 +161,4 @@ def render_equipment_results(payload, metric, limit):
 
 
 if __name__ == "__main__":
-    app.run(host=HOST, port=PORT, debug=False)
+    dash_app.run(host=HOST, port=PORT, debug=False)
