@@ -12,15 +12,21 @@
 body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, "Malgun Gothic", sans-serif; }
 .app-shell { max-width: 1500px; margin: 0 auto; padding: 28px 30px 18px; }
 .app-header { display: flex; justify-content: space-between; align-items: end; gap: 28px; padding: 10px 0 22px; }
+.header-copy { flex: 1; }
+.header-tools { width: min(440px, 42vw); display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
 .eyebrow { color: var(--blue); font-size: 11px; font-weight: 700; letter-spacing: .12em; }
 h1 { color: var(--navy); margin: 7px 0 5px; font-size: 30px; }
 .app-header p { color: var(--muted); margin: 0; font-size: 14px; }
-.file-picker { width: min(440px, 42vw); }
+.file-picker { width: 100%; }
 .file-picker label, .control label { display: block; color: var(--muted); font-weight: 700; font-size: 12px; margin: 0 0 7px; }
 .upload-control { display: inline-block; margin-top: 9px; }
 .upload-button { border: 1px solid var(--blue); border-radius: 6px; background: white; color: var(--blue); padding: 8px 12px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
 .upload-button:hover { background: #edf4fa; }
 .upload-hint { display: inline-block; color: var(--muted); font-size: 11px; margin-left: 9px; }
+.language-switch { display: inline-flex; gap: 2px; padding: 3px; border: 1px solid var(--border); border-radius: 8px; background: white; }
+.language-button { border: 0; border-radius: 5px; background: transparent; color: var(--muted); padding: 5px 9px; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.language-button:hover { background: #edf4fa; color: var(--navy); }
+.language-button.language-active { background: var(--navy); color: white; }
 .status-message { padding: 11px 14px; border-radius: 8px; margin: 5px 0 12px; font-size: 13px; }
 .status-ok { background: #e8f4ee; color: #276447; }
 .status-warning { background: #fff4df; color: #81590d; }
@@ -54,7 +60,9 @@ h1 { color: var(--navy); margin: 7px 0 5px; font-size: 30px; }
 @media (max-width: 920px) {
   .app-shell { padding: 18px 15px; }
   .app-header { display: block; }
-  .file-picker { width: 100%; margin-top: 18px; }
+  .header-tools { width: 100%; align-items: stretch; margin-top: 12px; }
+  .language-switch { align-self: flex-end; }
+  .file-picker { width: 100%; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .two-column { grid-template-columns: 1fr; }
   .filter-row { display: block; }

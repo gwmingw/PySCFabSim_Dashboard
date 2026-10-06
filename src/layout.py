@@ -2,6 +2,8 @@
 
 from dash import dash_table, dcc, html
 
+from src.i18n import t
+
 
 COLORS = {"navy": "#17365D", "blue": "#3973AC", "text": "#25313C", "muted": "#667482", "bg": "#F4F7FA", "border": "#E3E9EF"}
 
@@ -13,24 +15,42 @@ def _card(label: str, component_id: str) -> html.Div:
     )
 
 
-def _panel(title: str, children, class_name: str = "panel") -> html.Div:
-    return html.Div([html.H3(title), *children] if isinstance(children, list) else [html.H3(title), children], className=class_name)
+def _panel(title: str, children, class_name: str = "panel", title_id: str | None = None) -> html.Div:
+    heading = html.H3(title, id=title_id)
+    return html.Div([heading, *children] if isinstance(children, list) else [heading, children], className=class_name)
 
 
-def _lot_table() -> dash_table.DataTable:
+def lot_table_columns(language: str) -> list[dict]:
+    return [
+        {"name": t(language, "table_product"), "id": "product"},
+        {"name": t(language, "table_priority"), "id": "priority"},
+        {"name": t(language, "table_completed_lots"), "id": "throughput", "type": "numeric", "format": {"specifier": ",.0f"}},
+        {"name": t(language, "table_on_time"), "id": "on_time_pct", "type": "numeric", "format": {"specifier": ".2f"}},
+        {"name": t(language, "table_cycle_time"), "id": "act_days", "type": "numeric", "format": {"specifier": ".2f"}},
+        {"name": t(language, "table_mean_tardiness"), "id": "mean_tardiness_days", "type": "numeric", "format": {"specifier": ".2f"}},
+        {"name": t(language, "table_waiting"), "id": "waiting_days", "type": "numeric", "format": {"specifier": ".2f"}},
+        {"name": t(language, "table_processing"), "id": "processing_days", "type": "numeric", "format": {"specifier": ".2f"}},
+        {"name": t(language, "table_transport"), "id": "transport_days", "type": "numeric", "format": {"specifier": ".2f"}},
+    ]
+
+
+def machine_table_columns(language: str) -> list[dict]:
+    columns = [
+        (t(language, "table_tool_group"), "tool_group", None),
+        (t(language, "equipment_util"), "util_pct", ".2f"),
+        (t(language, "equipment_avail"), "avail_pct", ".2f"),
+        (t(language, "table_pm"), "pm_pct", ".2f"),
+        (t(language, "table_breakdown"), "breakdown_pct", ".2f"),
+        (t(language, "table_setup"), "setup_pct", ".2f"),
+        (t(language, "table_waiting"), "waiting_days", ".3f"),
+    ]
+    return [{"name": name, "id": key, **({"type": "numeric", "format": {"specifier": fmt}} if fmt else {})} for name, key, fmt in columns]
+
+
+def _lot_table(language: str) -> dash_table.DataTable:
     return dash_table.DataTable(
         id="lot-table",
-        columns=[
-            {"name": "제품", "id": "product"},
-            {"name": "우선순위", "id": "priority"},
-            {"name": "완료 lot", "id": "throughput", "type": "numeric", "format": {"specifier": ",.0f"}},
-            {"name": "정시율 (%)", "id": "on_time_pct", "type": "numeric", "format": {"specifier": ".2f"}},
-            {"name": "Cycle Time (일)", "id": "act_days", "type": "numeric", "format": {"specifier": ".2f"}},
-            {"name": "평균 지연 (일)", "id": "mean_tardiness_days", "type": "numeric", "format": {"specifier": ".2f"}},
-            {"name": "평균 대기 (일)", "id": "waiting_days", "type": "numeric", "format": {"specifier": ".2f"}},
-            {"name": "처리시간 (일)", "id": "processing_days", "type": "numeric", "format": {"specifier": ".2f"}},
-            {"name": "운반시간 (일)", "id": "transport_days", "type": "numeric", "format": {"specifier": ".2f"}},
-        ],
+        columns=lot_table_columns(language),
         data=[],
         sort_action="native",
         filter_action="native",
@@ -43,19 +63,10 @@ def _lot_table() -> dash_table.DataTable:
     )
 
 
-def _machine_table() -> dash_table.DataTable:
-    columns = [
-        ("Tool Group", "tool_group", None),
-        ("Utilization (%)", "util_pct", ".2f"),
-        ("가용률 (%)", "avail_pct", ".2f"),
-        ("PM (%)", "pm_pct", ".2f"),
-        ("고장 (%)", "breakdown_pct", ".2f"),
-        ("Setup (%)", "setup_pct", ".2f"),
-        ("평균 대기 (일)", "waiting_days", ".3f"),
-    ]
+def _machine_table(language: str) -> dash_table.DataTable:
     return dash_table.DataTable(
         id="machine-table",
-        columns=[{"name": name, "id": key, **({"type": "numeric", "format": {"specifier": fmt}} if fmt else {})} for name, key, fmt in columns],
+        columns=machine_table_columns(language),
         data=[],
         sort_action="native",
         filter_action="native",
@@ -72,63 +83,80 @@ def _machine_table() -> dash_table.DataTable:
     )
 
 
-def build_layout(result_options: list[dict], selected_file: str | None):
+def build_layout(result_options: list[dict], selected_file: str | None, language: str = "ko"):
     return html.Div(
         [
             html.Header(
                 [
-                    html.Div([html.Div("FAB OPERATIONS", className="eyebrow"), html.H1("PySCFabSim 결과 대시보드"), html.P("기준 생산운영 결과를 lot 그룹과 설비 관점에서 탐색합니다.")]),
+                    html.Div([html.Div("FAB OPERATIONS", className="eyebrow"), html.H1(t(language, "page_title"), id="header-title"), html.P(t(language, "header_description"), id="header-description")], className="header-copy"),
                     html.Div(
                         [
-                            html.Label("결과 파일", htmlFor="result-select"),
-                            dcc.Dropdown(id="result-select", options=result_options, value=selected_file, clearable=False, placeholder="결과 폴더의 JSON 선택"),
-                            dcc.Upload(
-                                id="result-upload",
-                                children=html.Button("탐색기에서 JSON 선택", type="button", className="upload-button"),
-                                accept=".json,application/json",
-                                multiple=False,
-                                className="upload-control",
+                            html.Div(
+                                [
+                                    html.Button("한국어", id="language-ko", n_clicks=0, className="language-button language-active", type="button"),
+                                    html.Button("English", id="language-en", n_clicks=0, className="language-button", type="button"),
+                                ],
+                                className="language-switch",
+                                role="group",
+                                **{"aria-label": "Language"},
                             ),
-                            html.Div("업로드한 파일은 저장하지 않고 현재 화면에서만 읽습니다.", className="upload-hint"),
+                            html.Div(
+                                [
+                                    html.Label(t(language, "file_label"), id="file-label", htmlFor="result-select"),
+                                    dcc.Dropdown(id="result-select", options=result_options, value=selected_file, clearable=False, placeholder=t(language, "file_placeholder")),
+                                    dcc.Upload(
+                                        id="result-upload",
+                                        children=html.Button(t(language, "upload_button"), id="upload-button", type="button", className="upload-button"),
+                                        accept=".json,application/json",
+                                        multiple=False,
+                                        className="upload-control",
+                                    ),
+                                    html.Div(t(language, "upload_hint"), id="upload-hint", className="upload-hint"),
+                                ],
+                                className="file-picker",
+                            ),
                         ],
-                        className="file-picker",
+                        className="header-tools",
                     ),
                 ],
                 className="app-header",
             ),
             html.Div(id="load-message", className="status-message", role="status"),
             html.Div(id="run-meta", className="run-meta"),
+            dcc.Store(id="language-store", storage_type="local", data=language),
+            dcc.Store(id="document-title-sync"),
+            dcc.Store(id="load-state"),
             dcc.Store(id="result-data"),
             dcc.Tabs(
                 id="main-tabs",
                 value="overview",
                 className="main-tabs",
                 children=[
-                    dcc.Tab(label="운영 요약", value="overview", children=[
+                    dcc.Tab(label=t(language, "tab_overview"), value="overview", id="tab-overview", children=[
                         html.Div(id="overview-cards", className="metric-grid"),
-                        html.Div([_panel("lot 그룹별 처리량과 Cycle Time", dcc.Graph(id="overview-lot-chart", config={"displaylogo": False})), _panel("Utilization 상위 Tool Group", dcc.Graph(id="overview-equipment-chart", config={"displaylogo": False}))], className="two-column"),
+                        html.Div([_panel(t(language, "panel_overview_lots"), dcc.Graph(id="overview-lot-chart", config={"displaylogo": False}), title_id="panel-overview-lots"), _panel(t(language, "panel_overview_equipment"), dcc.Graph(id="overview-equipment-chart", config={"displaylogo": False}), title_id="panel-overview-equipment")], className="two-column"),
                         html.Div(id="overview-notes", className="note-list"),
                     ]),
-                    dcc.Tab(label="Lot 그룹 성과", value="lots", children=[
+                    dcc.Tab(label=t(language, "tab_lots"), value="lots", id="tab-lots", children=[
                         html.Div([
-                            html.Div([html.Label("우선순위 유형"), dcc.Dropdown(id="lot-priority", options=[{"label": x, "value": x} for x in ["전체 유형", "Regular", "Hot", "SuperHot", "Unknown"]], value="전체 유형", clearable=False)], className="control"),
-                            html.Div([html.Label("차트 지표"), dcc.Dropdown(id="lot-metric", options=[{"label": x[0], "value": x[1]} for x in [("완료 lot 수", "throughput"), ("Cycle Time", "act_days"), ("정시 완료율", "on_time_pct"), ("완료 lot 기준 평균 지연", "mean_tardiness_days"), ("지연 lot 평균 지연", "late_lot_tardiness_days"), ("평균 대기시간", "waiting_days")]], value="act_days", clearable=False)], className="control"),
+                            html.Div([html.Label(t(language, "priority_label"), id="priority-label"), dcc.Dropdown(id="lot-priority", options=[{"label": t(language, key), "value": value} for key, value in [("all_priorities", "전체 유형"), ("regular", "Regular"), ("hot", "Hot"), ("superhot", "SuperHot"), ("unknown", "Unknown")]], value="전체 유형", clearable=False)], className="control"),
+                            html.Div([html.Label(t(language, "lot_metric_label"), id="lot-metric-label"), dcc.Dropdown(id="lot-metric", options=[{"label": t(language, label_key), "value": value} for label_key, value in [("metric_throughput", "throughput"), ("metric_cycle", "act_days"), ("metric_on_time", "on_time_pct"), ("metric_mean_tardiness", "mean_tardiness_days"), ("metric_late_tardiness", "late_lot_tardiness_days"), ("metric_waiting", "waiting_days")]], value="act_days", clearable=False)], className="control"),
                         ], className="filter-row"),
-                        _panel("lot 그룹 지표", dcc.Graph(id="lot-metric-chart", config={"displaylogo": False})),
-                        _panel("Lot 그룹 상세", _lot_table()),
+                        _panel(t(language, "panel_lot_metric"), dcc.Graph(id="lot-metric-chart", config={"displaylogo": False}), title_id="panel-lot-metric"),
+                        _panel(t(language, "panel_lot_detail"), _lot_table(language), title_id="panel-lot-detail"),
                     ]),
-                    dcc.Tab(label="설비 분석", value="equipment", children=[
+                    dcc.Tab(label=t(language, "tab_equipment"), value="equipment", id="tab-equipment", children=[
                         html.Div([
-                            html.Div([html.Label("설비 지표"), dcc.Dropdown(id="equipment-metric", options=[{"label": label, "value": key} for key, label in [("util_pct", "Utilization (%)"), ("waiting_days", "평균 대기시간 (일)"), ("avail_pct", "가용률 (%)"), ("pm_pct", "PM 시간 비율 (%)"), ("breakdown_pct", "고장 시간 비율 (%)"), ("setup_pct", "Setup 시간 비율 (%)")]], value="util_pct", clearable=False)], className="control"),
+                            html.Div([html.Label(t(language, "equipment_metric_label"), id="equipment-metric-label"), dcc.Dropdown(id="equipment-metric", options=[{"label": t(language, label_key), "value": key} for key, label_key in [("util_pct", "equipment_util"), ("waiting_days", "equipment_waiting"), ("avail_pct", "equipment_avail"), ("pm_pct", "equipment_pm"), ("breakdown_pct", "equipment_breakdown"), ("setup_pct", "equipment_setup")]], value="util_pct", clearable=False)], className="control"),
                             html.Div([html.Label(id="equipment-limit-label"), dcc.Slider(id="equipment-limit", min=5, max=30, step=5, value=15, marks={5: "5", 10: "10", 15: "15", 20: "20", 25: "25", 30: "30"})], className="control slider-control"),
                         ], className="filter-row"),
-                        html.Div([_panel("선택 지표 상위 Tool Group", dcc.Graph(id="equipment-metric-chart", config={"displaylogo": False})), _panel("Utilization과 대기시간", dcc.Graph(id="equipment-scatter-chart", config={"displaylogo": False}))], className="two-column"),
-                        _panel("Tool Group 상세 지표", _machine_table()),
-                        html.P("Utilization은 100% 초과값이 있을 수 있습니다. 해당 값은 자동 병목 판정이 아니라 원 지표 산식 확인 대상으로 표시합니다.", className="footnote"),
+                        html.Div([_panel(t(language, "panel_equipment_metric"), dcc.Graph(id="equipment-metric-chart", config={"displaylogo": False}), title_id="panel-equipment-metric"), _panel(t(language, "panel_equipment_scatter"), dcc.Graph(id="equipment-scatter-chart", config={"displaylogo": False}), title_id="panel-equipment-scatter")], className="two-column"),
+                        _panel(t(language, "panel_equipment_detail"), _machine_table(language), title_id="panel-equipment-detail"),
+                        html.P(t(language, "footnote"), id="equipment-footnote", className="footnote"),
                     ]),
                 ],
             ),
-            html.Footer("읽기 전용 결과 뷰어 · PySCFabSim 입력 데이터와 원본 결과 파일은 수정하지 않습니다.", className="app-footer"),
+            html.Footer(t(language, "footer"), id="app-footer", className="app-footer"),
         ],
         className="app-shell",
     )

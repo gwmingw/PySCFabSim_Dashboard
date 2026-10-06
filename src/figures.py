@@ -8,6 +8,8 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
+from src.i18n import t
+
 
 COLORS = {
     "navy": "#17365D",
@@ -19,14 +21,18 @@ COLORS = {
     "text": "#25313C",
 }
 PRIORITY_COLORS = {"Regular": "#3973AC", "Hot": "#E68632", "SuperHot": "#C65353", "Unknown": "#7C8794"}
-METRIC_LABELS = {
-    "util_pct": "Utilization (%)",
-    "waiting_days": "평균 대기시간 (일)",
-    "avail_pct": "가용률 (%)",
-    "pm_pct": "PM 시간 비율 (%)",
-    "breakdown_pct": "고장 시간 비율 (%)",
-    "setup_pct": "Setup 시간 비율 (%)",
+METRIC_LABEL_KEYS = {
+    "util_pct": "equipment_util",
+    "waiting_days": "equipment_waiting",
+    "avail_pct": "equipment_avail",
+    "pm_pct": "equipment_pm",
+    "breakdown_pct": "equipment_breakdown",
+    "setup_pct": "equipment_setup",
 }
+
+
+def _priority_label(value: str, language: str) -> str:
+    return t(language, "unknown") if value == "Unknown" else value
 
 
 def empty_figure(message: str = "표시할 결과가 없습니다.") -> go.Figure:
@@ -51,64 +57,81 @@ def _base_layout(figure: go.Figure, title: str, height: int = 360) -> go.Figure:
     return figure
 
 
-def overview_lot_figure(lots: list[dict[str, Any]]) -> go.Figure:
+def overview_lot_figure(lots: list[dict[str, Any]], language: str = "ko") -> go.Figure:
     frame = pd.DataFrame(lots)
     if frame.empty:
-        return empty_figure()
-    frame["group_label"] = frame["product"].astype(str) + " · " + frame["priority"].astype(str)
+        return empty_figure(t(language, "empty_equipment"))
+    frame["display_product"] = frame["product"].replace({"기타 그룹": t(language, "other_group")})
+    frame["display_priority"] = frame["priority"].map(lambda value: _priority_label(value, language))
+    frame["group_label"] = frame["display_product"].astype(str) + " · " + frame["display_priority"].astype(str)
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="완료 lot", x=frame["group_label"], y=frame["throughput"], marker_color=COLORS["blue"], yaxis="y"))
-    fig.add_trace(go.Scatter(name="Cycle Time (일)", x=frame["group_label"], y=frame["act_days"], mode="lines+markers", marker_color=COLORS["orange"], line={"width": 2}, yaxis="y2"))
+    fig.add_trace(go.Bar(name=t(language, "fig_completed_lots"), x=frame["group_label"], y=frame["throughput"], marker_color=COLORS["blue"], yaxis="y"))
+    fig.add_trace(go.Scatter(name=t(language, "fig_cycle_days"), x=frame["group_label"], y=frame["act_days"], mode="lines+markers", marker_color=COLORS["orange"], line={"width": 2}, yaxis="y2"))
     fig.update_layout(
         barmode="group",
-        yaxis={"title": "완료 lot 수", "rangemode": "tozero", "gridcolor": COLORS["grid"]},
-        yaxis2={"title": "Cycle Time (일)", "overlaying": "y", "side": "right", "showgrid": False},
+        yaxis={"title": t(language, "fig_completed_lot_count"), "rangemode": "tozero", "gridcolor": COLORS["grid"]},
+        yaxis2={"title": t(language, "fig_cycle_days"), "overlaying": "y", "side": "right", "showgrid": False},
         legend={"orientation": "h", "y": 1.12, "x": 1, "xanchor": "right"},
         xaxis={"tickangle": -35},
     )
-    return _base_layout(fig, "Lot 그룹별 처리량과 Cycle Time", 420)
+    return _base_layout(fig, t(language, "panel_overview_lots"), 420)
 
 
-def lot_metric_figure(lots: list[dict[str, Any]], priority: str, metric: str) -> go.Figure:
+def lot_metric_figure(lots: list[dict[str, Any]], priority: str, metric: str, language: str = "ko") -> go.Figure:
     frame = pd.DataFrame(lots)
     if frame.empty:
-        return empty_figure()
+        return empty_figure(t(language, "empty_equipment"))
     if priority != "전체 유형":
         frame = frame[frame["priority"] == priority]
     if frame.empty:
-        return empty_figure("선택한 유형에 표시할 lot 그룹이 없습니다.")
+        return empty_figure(t(language, "empty_priority"))
     labels = {
-        "throughput": ("완료 lot 수", "완료 lot 수"),
-        "act_days": ("평균 Cycle Time", "Cycle Time (일)"),
-        "on_time_pct": ("정시 완료율", "정시 완료율 (%)"),
-        "mean_tardiness_days": ("평균 지연시간", "완료 lot 기준 평균 지연 (일)"),
-        "late_lot_tardiness_days": ("지연 lot 평균 지연시간", "지연 lot 평균 지연 (일)"),
-        "waiting_days": ("평균 대기시간", "평균 대기시간 (일)"),
+        "throughput": ("fig_completed_lots", "fig_completed_lots"),
+        "act_days": ("fig_mean_cycle", "fig_cycle_days"),
+        "on_time_pct": ("fig_on_time", "fig_on_time_pct"),
+        "mean_tardiness_days": ("fig_mean_tardiness", "fig_mean_tardiness_days"),
+        "late_lot_tardiness_days": ("fig_late_tardiness", "fig_late_tardiness_days"),
+        "waiting_days": ("fig_waiting", "fig_waiting_days"),
     }
-    title, y_title = labels.get(metric, labels["act_days"])
+    title_key, y_title_key = labels.get(metric, labels["act_days"])
+    title, y_title = t(language, title_key), t(language, y_title_key)
+    frame["display_product"] = frame["product"].replace({"기타 그룹": t(language, "other_group")})
+    frame["display_priority"] = frame["priority"].map(lambda value: _priority_label(value, language))
+    hover_labels = {
+        "name": t(language, "fig_lot_group"),
+        "throughput": t(language, "fig_completed_lots"),
+        "on_time_pct": t(language, "fig_on_time_pct"),
+        "act_days": t(language, "fig_cycle_days"),
+        "mean_tardiness_days": t(language, "fig_mean_tardiness_days"),
+        "late_lot_tardiness_days": t(language, "fig_late_tardiness_days"),
+        "waiting_days": t(language, "fig_waiting_days"),
+        "display_product": t(language, "fig_product"),
+        "display_priority": t(language, "fig_priority"),
+    }
     fig = px.bar(
         frame,
-        x="product",
+        x="display_product",
         y=metric,
-        color="priority",
+        color="display_priority",
         barmode="group",
-        category_orders={"priority": ["Regular", "Hot", "SuperHot", "Unknown"]},
-        color_discrete_map=PRIORITY_COLORS,
+        category_orders={"display_priority": [_priority_label(value, language) for value in ["Regular", "Hot", "SuperHot", "Unknown"]]},
+        color_discrete_map={_priority_label(value, language): color for value, color in PRIORITY_COLORS.items()},
         hover_data={"name": True, "throughput": ":.0f", "on_time_pct": ":.2f", metric: ":.2f"},
+        labels=hover_labels,
     )
-    fig.update_layout(legend_title_text="우선순위", xaxis_title="제품", yaxis_title=y_title)
-    fig.update_xaxes(categoryorder="array", categoryarray=frame["product"].drop_duplicates().tolist())
-    return _base_layout(fig, f"제품별 {title}", 390)
+    fig.update_layout(legend_title_text=t(language, "fig_priority"), xaxis_title=t(language, "fig_product"), yaxis_title=y_title)
+    fig.update_xaxes(categoryorder="array", categoryarray=frame["display_product"].drop_duplicates().tolist())
+    return _base_layout(fig, t(language, "figure_lot_title", title), 390)
 
 
-def equipment_metric_figure(machines: list[dict[str, Any]], metric: str, limit: int) -> go.Figure:
+def equipment_metric_figure(machines: list[dict[str, Any]], metric: str, limit: int, language: str = "ko") -> go.Figure:
     frame = pd.DataFrame(machines)
     if frame.empty or metric not in frame.columns:
-        return empty_figure()
+        return empty_figure(t(language, "empty_equipment"))
     frame = frame.dropna(subset=[metric]).nlargest(max(1, int(limit)), metric).sort_values(metric, ascending=True)
     if frame.empty:
-        return empty_figure("선택한 지표에 값이 없습니다.")
-    label = METRIC_LABELS.get(metric, metric)
+        return empty_figure(t(language, "empty_metric"))
+    label = t(language, METRIC_LABEL_KEYS[metric])
     bar_color = [COLORS["red"] if metric == "util_pct" and value > 100 else COLORS["blue"] for value in frame[metric]]
     fig = go.Figure(go.Bar(
         x=frame[metric],
@@ -117,25 +140,28 @@ def equipment_metric_figure(machines: list[dict[str, Any]], metric: str, limit: 
         marker_color=bar_color,
         customdata=frame[["avail_pct", "util_pct", "pm_pct", "breakdown_pct", "setup_pct", "waiting_days"]],
         hovertemplate=(
-            "<b>%{y}</b><br>선택 지표: %{x:.2f}<br>가용률: %{customdata[0]:.2f}%<br>"
-            "Utilization: %{customdata[1]:.2f}%<br>PM: %{customdata[2]:.2f}%<br>"
-            "고장: %{customdata[3]:.2f}%<br>Setup: %{customdata[4]:.2f}%<br>"
-            "평균 대기: %{customdata[5]:.2f}일<extra></extra>"
+            f"<b>%{{y}}</b><br>{t(language, 'hover_selected_metric')}: %{{x:.2f}}<br>"
+            f"{t(language, 'hover_availability')}: %{{customdata[0]:.2f}}%<br>"
+            f"{t(language, 'hover_utilization')}: %{{customdata[1]:.2f}}%<br>"
+            f"{t(language, 'hover_pm')}: %{{customdata[2]:.2f}}%<br>"
+            f"{t(language, 'hover_breakdown')}: %{{customdata[3]:.2f}}%<br>"
+            f"{t(language, 'hover_setup')}: %{{customdata[4]:.2f}}%<br>"
+            f"{t(language, 'hover_waiting')}: %{{customdata[5]:.2f}}{t(language, 'days_suffix')}<extra></extra>"
         ),
     ))
-    fig.update_layout(xaxis_title=label, yaxis_title="Tool Group", xaxis={"rangemode": "tozero"})
+    fig.update_layout(xaxis_title=label, yaxis_title=t(language, "table_tool_group"), xaxis={"rangemode": "tozero"})
     if metric == "util_pct":
         fig.add_vline(x=100, line_dash="dash", line_color=COLORS["red"], annotation_text="100%", annotation_position="top")
-    return _base_layout(fig, f"{label} 상위 {len(frame)}개", max(390, min(780, 22 * len(frame) + 130)))
+    return _base_layout(fig, t(language, "figure_top_equipment", label, len(frame)), max(390, min(780, 22 * len(frame) + 130)))
 
 
-def equipment_scatter_figure(machines: list[dict[str, Any]]) -> go.Figure:
+def equipment_scatter_figure(machines: list[dict[str, Any]], language: str = "ko") -> go.Figure:
     frame = pd.DataFrame(machines)
     if frame.empty:
-        return empty_figure()
+        return empty_figure(t(language, "empty_equipment"))
     frame = frame.dropna(subset=["util_pct", "waiting_days"])
     if frame.empty:
-        return empty_figure("Utilization과 평균 대기시간이 모두 있는 설비가 없습니다.")
+        return empty_figure(t(language, "empty_scatter"))
     fig = px.scatter(
         frame,
         x="util_pct",
@@ -145,7 +171,14 @@ def equipment_scatter_figure(machines: list[dict[str, Any]]) -> go.Figure:
         hover_name="tool_group",
         hover_data={"avail_pct": ":.2f", "util_pct": ":.2f", "breakdown_pct": ":.2f", "waiting_days": ":.2f"},
         color_continuous_scale="YlOrRd",
-        labels={"util_pct": "Utilization (%)", "waiting_days": "평균 대기시간 (일)", "breakdown_pct": "고장 비율 (%)", "pm_pct": "PM 비율 (%)"},
+        labels={
+            "tool_group": t(language, "table_tool_group"),
+            "avail_pct": t(language, "equipment_avail"),
+            "util_pct": t(language, "equipment_util"),
+            "waiting_days": t(language, "equipment_waiting"),
+            "breakdown_pct": t(language, "equipment_breakdown"),
+            "pm_pct": t(language, "equipment_pm"),
+        },
     )
     fig.add_vline(x=100, line_dash="dash", line_color=COLORS["red"], opacity=0.7)
-    return _base_layout(fig, "Utilization과 대기시간", 420)
+    return _base_layout(fig, t(language, "fig_util_wait"), 420)
